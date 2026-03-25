@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Library Seat Finder</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {margin:0; font-family:'Poppins',sans-serif; background:linear-gradient(135deg,#e3f2fd,#fff); text-align:center;}
+        .page {display:none; padding-top:40px;}
+        .active {display:block;}
+        .logo {width:170px; margin-top:40px; display:block; margin-left:auto; margin-right:auto;}
+        h2 {font-size:28px; font-weight:400; color:#666; margin-top:-15px; margin-bottom:0;}
+        h3 {font-size:40px; font-weight:600; margin:10px 0 30px 0;}
+        .highlight {color:#1976d2;}
+        .seat-box {margin-top:30px; font-size:22px; background:white; padding:35px 70px; border-radius:20px; box-shadow:0 15px 30px rgba(0,0,0,0.12); display:inline-block;}
+        .seat-number {color:#28a745; font-size:60px; font-weight:700; margin-top:10px;}
+        .button-container {margin-top:50px;}
+        .btn {background:#1976d2; color:white; padding:18px 55px; font-size:20px; border:none; border-radius:50px; cursor:pointer; transition:all 0.3s ease;}
+        .btn:hover {background:#125ca1; transform:translateY(-3px); box-shadow:0 8px 20px rgba(0,0,0,0.15);}
+        #levelPage .btn, #layoutPage .btn {margin-top:20px; margin-bottom:10px;}
+        .level-container {margin-top:30px; display:flex; flex-direction:column; align-items:center;}
+        .level-box {background:white; width:300px; margin:10px; padding:15px 25px; border-radius:8px; box-shadow:0 3px 6px rgba(0,0,0,0.2); font-size:22px; cursor:pointer;}
+        .level-box:hover {background:#f0f0f0;}
+        .layout-container {margin-top:30px; display:flex; flex-direction:column; align-items:center; gap:15px;}
+        .seat {width:50px; height:50px; margin:5px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:12px; color:white; font-weight:bold;}
+        .available {background-color:green;}
+        .occupied {background-color:red;}
+        .legend {margin-top:25px; font-size:18px; display:flex; justify-content:center; gap:20px; align-items:center;}
+        .legend span {display:inline-block; width:20px; height:20px; border-radius:4px; margin-right:5px;}
+        .levelWithImages .layout-container {gap:40px;}
+        .levelWithImages .group-row {display:flex; gap:50px;}
+        .levelWithImages .group {display:grid; grid-template-columns:repeat(2,35px); grid-template-rows:repeat(2,35px); gap:8px;}
+        .levelWithImages .seat {width:35px; height:35px;}
+        .levelWithImages .image-row {display:flex; justify-content:center; gap:20px; flex-wrap:wrap; margin-top:20px;}
+        .levelWithImages .level-image {width:200px; height:150px; object-fit:cover; border-radius:15px; box-shadow:0 8px 20px rgba(0,0,0,0.25); cursor:pointer;}
+        .grid-layout {display: grid; grid-template-columns: repeat(6, 50px); grid-auto-rows: 50px; gap: 8px; justify-content: center;}
+        .popup {display:none; position:fixed; z-index:999; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter: blur(5px);}
+        .popup-content {max-width:80%; max-height:80%; border-radius:15px;}
+        .close {color:white; font-size:40px; position:absolute; top:20px; right:40px; cursor:pointer;}
+    </style>
+</head>
+<body>
+
+<!-- HOME PAGE -->
+<div id="homePage" class="page active">
+    <img src="utp-removebg-preview.png" class="logo" 
+         onerror="this.onerror=null; this.src='https://i.imgur.com/1Hc1F8b.png';">
+    <div class="arc-text">
+        <svg width="500" height="110">
+            <path id="curve" d="M 50 90 Q 250 10 450 90" fill="transparent" />
+            <text font-size="50" font-weight="700" fill="#000">
+                <textPath href="#curve" startOffset="50%" text-anchor="middle">Welcome</textPath>
+            </text>
+        </svg>
+    </div>
+    <h2>To</h2>
+    <h3><span class="highlight">Library</span> Seat Finder <span class="highlight">System</span></h3>
+    <div class="seat-box">
+        Total Seats Available: <div class="seat-number" id="seatCount">0</div>
+    </div>
+    <div class="button-container">
+        <button class="btn" onclick="showLevelPage()">Next</button>
+    </div>
+</div>
+
+<!-- LEVEL PAGE -->
+<div id="levelPage" class="page">
+    <h1>Seat Levels</h1>
+    <div class="level-container" id="levelsList"></div>
+    <button class="btn" onclick="goHome()">Back to Home</button>
+</div>
+
+<!-- LAYOUT PAGE -->
+<div id="layoutPage" class="page">
+    <h1 id="layoutTitle"></h1>
+    <div id="levelImages" class="image-row" style="display:none;"></div>
+    <div class="layout-container" id="seatLayout"></div>
+    <div class="legend">
+        <span style="background-color:green;"></span> Available
+        <span style="background-color:red;"></span> Occupied
+    </div>
+    <button class="btn" onclick="showLevelPage()">Back to Levels</button>
+</div>
+
+<!-- POPUP -->
+<div id="imagePopup" class="popup" onclick="closePopup()">
+    <span class="close">&times;</span>
+    <img class="popup-content" id="popupImg">
+</div>
+
+<script>
+const ESP_IP = "10.205.101.250";
+
+const levels = {
+    "Ground Level":[
+        "occupied","occupied","available","available",
+        "available","available","occupied","available",
+        "available","occupied","available","available",
+        "occupied","available","occupied","available",
+        "available","available","occupied","available",
+        "occupied","available","available","occupied"
+    ],
+    "Level 1":["occupied","available","available","occupied","available","available","occupied","available","available","occupied","available","available","occupied","available","available","occupied","occupied","available","available","occupied","available","available","occupied","available"],
+    "Level 2":["available","available","occupied","available","available","occupied","available","occupied","available","available","occupied","available","available","occupied","available","available","occupied","available","available","occupied","available","occupied","available","available"],
+    "Level 3":["occupied","occupied","available","available","available","available","occupied","available","available","occupied","available","available","occupied","available","available","occupied","available","available","occupied","available","occupied","available","available","available","available","occupied","available","available","occupied","available","available","available","occupied","available"]
+};
+
+// Fetch sensor data and update Level 3
+async function fetchSeatData(){
+    try {
+        const response = await fetch(`http://${ESP_IP}/seats`);
+        const data = await response.json();
+
+        // Map sensors to first two Level 3 seats
+        levels["Level 3"][0] = data.seat1;
+        levels["Level 3"][1] = data.seat2;
+
+        updateTotalSeats();
+
+        // Update Level 3 seat colors if visible
+        if(layoutTitle.innerText.includes("Level 3")){
+            const seatDivs = seatLayout.querySelectorAll(".seat");
+            seatDivs.forEach((div,index)=>{
+                div.className = "seat "+levels["Level 3"][index];
+            });
+        }
+    } catch(err){
+        console.log("Fetch error:", err);
+    }
+}
+
+// Auto-refresh every 2 seconds
+setInterval(fetchSeatData,2000);
+fetchSeatData();
+
+// Update total available seats
+function updateTotalSeats(){
+    let total=0;
+    for(let lvl in levels){
+        total+=levels[lvl].filter(s=>s==="available").length;
+    }
+    document.getElementById("seatCount").innerText=total;
+}
+
+// Page navigation
+function showLevelPage(){
+    homePage.classList.remove("active");
+    layoutPage.classList.remove("active");
+    levelPage.classList.add("active");
+    renderLevels();
+}
+
+function goHome(){
+    homePage.classList.add("active");
+    levelPage.classList.remove("active");
+    layoutPage.classList.remove("active");
+}
+
+// Render levels
+function renderLevels(){
+    levelsList.innerHTML="";
+    for(let lvl in levels){
+        const count=levels[lvl].filter(s=>s==="available").length;
+        const div=document.createElement("div");
+        div.className="level-box";
+        div.innerText=lvl+" - Available Seats: "+count;
+        div.onclick=()=>showLayout(lvl);
+        levelsList.appendChild(div);
+    }
+}
+
+// Show layout
+function showLayout(levelName){
+    levelPage.classList.remove("active");
+    layoutPage.classList.add("active");
+    layoutTitle.innerText = levelName + " Layout";
+
+    fetchSeatData(); // refresh immediately
+
+    seatLayout.innerHTML="";
+    levelImages.innerHTML="";
+
+    let images=[];
+    if(levelName==="Ground Level"){
+        images=["WhatsApp Image 2026-03-05 at 12.07.15 AM.jpeg","WhatsApp Image 2026-03-18 at 3.02.22 AM.jpeg"];
+    } else if(levelName==="Level 1"||levelName==="Level 2"){
+        images=["WhatsApp Image 2026-03-05 at 12.07.14 AM.jpeg","WhatsApp Image 2026-03-03 at 8.33.13 PM (1).jpeg"];
+    } else if(levelName==="Level 3"){
+        images=["WhatsApp Image 2026-03-03 at 8.33.12 PM.jpeg","WhatsApp Image 2026-03-03 at 8.48.30 PM.jpeg"];
+    }
+
+    if(images.length>0){
+        levelImages.style.display="flex";
+        layoutPage.classList.add("levelWithImages");
+        images.forEach(src=>{
+            const img=document.createElement("img");
+            img.src=src;
+            img.className="level-image";
+            img.onclick=()=>openPopup(src);
+            levelImages.appendChild(img);
+        });
+    } else {
+        levelImages.style.display="none";
+        layoutPage.classList.remove("levelWithImages");
+    }
+
+    const seats=levels[levelName];
+
+    if(levelName==="Level 3"){
+        for(let line=0;line<2;line++){
+            const lineDiv=document.createElement("div");
+            lineDiv.className="group-row";
+            for(let g=0;g<4;g++){
+                const groupIndex=line*4+g;
+                const group=document.createElement("div");
+                group.className="group";
+                for(let s=0;s<4;s++){
+                    const seatIndex=groupIndex*4+s;
+                    if(seatIndex<seats.length){
+                        const seatDiv=document.createElement("div");
+                        seatDiv.className="seat "+seats[seatIndex];
+                        seatDiv.innerText=seatIndex+1;
+                        group.appendChild(seatDiv);
+                    }
+                }
+                lineDiv.appendChild(group);
+            }
+            seatLayout.appendChild(lineDiv);
+        }
+    } else {
+        const grid=document.createElement("div");
+        grid.className="grid-layout";
+        seats.forEach((s,index)=>{
+            const seat=document.createElement("div");
+            seat.className="seat "+s;
+            seat.innerText=index+1;
+            grid.appendChild(seat);
+        });
+        seatLayout.appendChild(grid);
+    }
+}
+
+// Popup functions
+function openPopup(src){
+    imagePopup.style.display="block";
+    popupImg.src=src;
+}
+function closePopup(){
+    imagePopup.style.display="none";
+}
+</script>
+
+</body>
+</html>
