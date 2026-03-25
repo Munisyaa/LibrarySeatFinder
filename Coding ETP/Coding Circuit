@@ -1,0 +1,117 @@
+#include <WiFi.h>
+#include <WebServer.h>
+
+// ----------- PIN SETUP -----------
+#define trigPin1 4
+#define echoPin1 2
+
+#define trigPin2 5
+#define echoPin2 18
+
+// ----------- WIFI -----------
+const char* ssid = "Lembu busuk";
+const char* password = "12345678";
+
+// ----------- SERVER -----------
+WebServer server(80);
+
+// ----------- VARIABLES -----------
+long duration1, duration2;
+float distance1, distance2;
+
+String seat1 = "available";
+String seat2 = "available";
+
+// ----------- FUNCTION: READ SENSOR -----------
+float getDistance(int trigPin, int echoPin) {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH, 30000); // timeout 30ms
+
+  if (duration == 0) return 999; // no reading
+
+  float distance = duration * 0.034 / 2;
+  return distance;
+}
+
+// ----------- FUNCTION: UPDATE SEATS -----------
+void readSensors() {
+
+  distance1 = getDistance(trigPin1, echoPin1);
+  delay(50); // small delay for stability
+  distance2 = getDistance(trigPin2, echoPin2);
+
+  // Seat 1 logic
+  if (distance1 >= 50 || distance1 == 999) {
+    seat1 = "available";
+  } else {
+    seat1 = "occupied";
+  }
+
+  // Seat 2 logic
+  if (distance2 >= 50 || distance2 == 999) {
+    seat2 = "available";
+  } else {
+    seat2 = "occupied";
+  }
+
+  // Debug print
+  Serial.print("Seat1: "); Serial.print(seat1);
+  Serial.print(" | Distance1: "); Serial.print(distance1);
+
+  Serial.print(" || Seat2: "); Serial.print(seat2);
+  Serial.print(" | Distance2: "); Serial.println(distance2);
+}
+
+// ----------- FUNCTION: SEND DATA -----------
+void sendData() {
+  readSensors();
+
+  String json = "{";
+  json += "\"seat1\":\"" + seat1 + "\",";
+  json += "\"seat2\":\"" + seat2 + "\"";
+  json += "}";
+
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200, "application/json", json);
+}
+
+// ----------- SETUP -----------
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(trigPin1, OUTPUT);
+  pinMode(echoPin1, INPUT);
+
+  pinMode(trigPin2, OUTPUT);
+  pinMode(echoPin2, INPUT);
+
+  // Connect WiFi
+  WiFi.begin(ssid, password);
+
+  Serial.println("Connecting to WiFi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nConnected!");
+  Serial.print("ESP32 IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  // Route
+  server.on("/seats", sendData);
+
+  server.begin();
+  Serial.println("Server started");
+}
+
+// ----------- LOOP -----------
+void loop() {
+  server.handleClient();
+}
